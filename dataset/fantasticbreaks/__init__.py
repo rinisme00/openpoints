@@ -1,0 +1,1 @@
+from .fantasticbreaks_cls import FantasticBreaksCls
