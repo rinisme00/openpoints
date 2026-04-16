@@ -38,28 +38,29 @@ from torch.utils.data import Dataset
 from ..build import DATASETS
 
 
-def _load_h5_files(data_dir: str, split: str) -> tuple[np.ndarray, np.ndarray]:
+def _load_h5_files(data_dirs: list[str] | str, split: str) -> tuple[np.ndarray, np.ndarray]:
     """
-    Load all HDF5 files matching `<split>_data.h5` inside `data_dir`.
-
-    Returns:
-        points : float32 array of shape [N_total, max_points, 3]
-        labels : int64 array of shape [N_total]
+    Load all HDF5 files matching `<split>_data.h5` across multiple directories.
     """
-    pattern = os.path.join(data_dir, f"{split}_data.h5")
-    h5_files = sorted(glob.glob(pattern))
-
-    if not h5_files:
-        raise FileNotFoundError(
-            f"No HDF5 files found matching '{pattern}'.\n"
-            f"Run scripts/prepare_classification_data.py first."
-        )
+    if isinstance(data_dirs, str):
+        data_dirs = [data_dirs]
 
     all_points, all_labels = [], []
-    for fpath in h5_files:
-        with h5py.File(fpath, "r") as f:
-            all_points.append(f["data"][:].astype(np.float32))   # [B, N, 3]
-            all_labels.append(f["label"][:].astype(np.int64).squeeze(-1))  # [B]
+    for ddir in data_dirs:
+        pattern = os.path.join(ddir, f"{split}_data.h5")
+        h5_files = sorted(glob.glob(pattern))
+
+        if not h5_files:
+            logging.warning(f"No HDF5 files found matching '{pattern}'. Skipping...")
+            continue
+
+        for fpath in h5_files:
+            with h5py.File(fpath, "r") as f:
+                all_points.append(f["data"][:].astype(np.float32))   # [B, N, 3]
+                all_labels.append(f["label"][:].astype(np.int64).squeeze(-1))  # [B]
+
+    if not all_points:
+        raise FileNotFoundError(f"No HDF5 files found for split '{split}' in directories: {data_dirs}")
 
     points = np.concatenate(all_points, axis=0)   # [N_total, N, 3]
     labels = np.concatenate(all_labels, axis=0)   # [N_total]
@@ -86,23 +87,28 @@ class FantasticBreaksCls(Dataset):
 
     def __init__(
         self,
-        data_dir: str = "data/classification",
+        data_dir: str | list[str] = "data/classification",
         num_points: int = 2048,
         split: str = "train",
         transform=None,
         **kwargs,          # absorb extra keys from YAML (e.g. 'NAME')
     ):
         super().__init__()
-        # Resolve relative paths against current working directory
-        if not os.path.isabs(data_dir):
-            data_dir = os.path.join(os.getcwd(), data_dir)
+        # Ensure data_dir is a list of absolute paths
+        if isinstance(data_dir, str):
+            data_dir = [d.strip() for d in data_dir.split(',')]
+        
+        self.data_dirs = []
+        for d in data_dir:
+            if not os.path.isabs(d):
+                d = os.path.join(os.getcwd(), d)
+            self.data_dirs.append(d)
 
-        self.data_dir = data_dir
         self.num_points = num_points
         self.split = "train" if split.lower() == "train" else "test"
         self.transform = transform
 
-        self.points, self.labels = _load_h5_files(self.data_dir, self.split)
+        self.points, self.labels = _load_h5_files(self.data_dirs, self.split)
 
         logging.info(
             f"[FantasticBreaksCls] Loaded {self.split}: "
