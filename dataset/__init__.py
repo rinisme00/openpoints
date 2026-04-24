@@ -9,3 +9,4 @@ from .scanobjectnn import *
 from .shapenetpart import *
 from .scannetv2 import *
 from .fantasticbreaks import *
+from .breakingbad import *

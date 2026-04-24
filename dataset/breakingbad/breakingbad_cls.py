@@ -1,6 +1,6 @@
 """
-FantasticBreaksCls — PointNeXt dataset loader for binary classification of
-broken vs. complete 3D objects from the Fantastic Breaks v1 dataset.
+BreakingBadCls — PointNeXt dataset loader for binary classification of
+broken vs. complete 3D objects from the Breaking Bad dataset.
 
 Supports dynamic feature dimensions (e.g. 3D baseline or 9D enriched).
 """
@@ -59,9 +59,9 @@ def _load_h5_files(
 
 
 @DATASETS.register_module()
-class FantasticBreaksCls(Dataset):
+class BreakingBadCls(Dataset):
     """
-    Binary classification dataset for the Fantastic Breaks v1 collection.
+    Binary classification dataset for the Breaking Bad collection.
 
     Classes:
         0 → complete
@@ -72,7 +72,7 @@ class FantasticBreaksCls(Dataset):
 
     def __init__(
         self,
-        data_dir: str | list[str] = "data/classification",
+        data_dir: str | list[str] = "data/bb_classification",
         num_points: int = 2048,
         split: str = "train",
         transform=None,
@@ -104,7 +104,7 @@ class FantasticBreaksCls(Dataset):
         self.class_counts = np.bincount(self.labels, minlength=len(self.classes))
         
         logging.info(
-            f"[FantasticBreaksCls] Loaded {self.split}: "
+            f"[BreakingBadCls] Loaded {self.split}: "
             f"{len(self.points)} samples | "
             f"class_counts={self.class_counts.tolist()} | "
             f"feat_dim={self.feat_dim} ({'enriched' if enriched else 'baseline'})"

@@ -1,6 +1,7 @@
 """
 Author: PointNeXt
 """
+import logging
 import numpy as np
 import torch
 from easydict import EasyDict as edict
@@ -75,24 +76,27 @@ def build_dataloader_from_cfg(batch_size,
     collate_fn = eval(collate_fn) if isinstance(collate_fn, str) else collate_fn
 
     shuffle = split == 'train'
+    sampler = None
     if distributed:
         sampler = torch.utils.data.distributed.DistributedSampler(dataset, shuffle=shuffle)
-        dataloader = torch.utils.data.DataLoader(dataset,
-                                                 batch_size=batch_size,
-                                                 num_workers=int(dataloader_cfg.num_workers),
-                                                 worker_init_fn=worker_init_fn,
-                                                 drop_last=split == 'train',
-                                                 sampler=sampler,
-                                                 collate_fn=collate_fn, 
-                                                 pin_memory=True
-                                                 )
-    else:
-        dataloader = torch.utils.data.DataLoader(dataset,
-                                                 batch_size=batch_size,
-                                                 num_workers=int(dataloader_cfg.num_workers),
-                                                 worker_init_fn=worker_init_fn,
-                                                 drop_last=split == 'train',
-                                                 shuffle=shuffle,
-                                                 collate_fn=collate_fn,
-                                                 pin_memory=True)
+    elif split == 'train' and dataloader_cfg.get('use_balanced_sampler', False):
+        if hasattr(dataset, 'get_sample_weights'):
+            from torch.utils.data import WeightedRandomSampler
+            weights = dataset.get_sample_weights()
+            sampler = WeightedRandomSampler(weights, len(weights))
+            shuffle = False  # sampler is mutually exclusive with shuffle
+            logging.info(f"[build_dataloader] Using WeightedRandomSampler for {split}")
+        else:
+            logging.warning(f"[build_dataloader] Dataset {type(dataset).__name__} does not support get_sample_weights. Falling back to default.")
+
+    dataloader = torch.utils.data.DataLoader(dataset,
+                                             batch_size=batch_size,
+                                             num_workers=int(dataloader_cfg.num_workers),
+                                             worker_init_fn=worker_init_fn,
+                                             drop_last=split == 'train',
+                                             sampler=sampler,
+                                             shuffle=shuffle if sampler is None else False,
+                                             collate_fn=collate_fn, 
+                                             pin_memory=True
+                                             )
     return dataloader
