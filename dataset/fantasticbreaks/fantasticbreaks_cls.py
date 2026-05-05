@@ -77,6 +77,7 @@ class FantasticBreaksCls(Dataset):
         split: str = "train",
         transform=None,
         enriched: bool = False,
+        use_3d_only: bool = False,
         **kwargs,
     ):
         super().__init__()
@@ -93,6 +94,7 @@ class FantasticBreaksCls(Dataset):
         self.split      = split.lower()
         self.transform  = transform
         self.enriched   = enriched
+        self.use_3d_only = use_3d_only
 
         self.points, self.labels = _load_h5_files(
             self.data_dirs, self.split, enriched=self.enriched
@@ -130,7 +132,10 @@ class FantasticBreaksCls(Dataset):
             np.random.shuffle(pts)
 
         # Extract features (cols 3+)
-        geom_feats = pts[:, 3:].copy() if self.feat_dim > 3 else None
+        if self.use_3d_only:
+            geom_feats = None
+        else:
+            geom_feats = pts[:, 3:].copy() if self.feat_dim > 3 else None
 
         data = {
             "pos": pts[:, :3].copy(),   # [num_points, 3]
